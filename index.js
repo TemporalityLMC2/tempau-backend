@@ -1,50 +1,67 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const mongoose = require('mongoose');
 const cors = require('cors');
+const sequelize = require('./database');
+const { DataTypes } = require('sequelize');
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-mongoose.connect('mongodb://localhost:27017/tempau', { useNewUrlParser: true, useUnifiedTopology: true });
-
-const textSchema = new mongoose.Schema({
-  type: String,
-  content: String,
-  timestamp: Date
+const Text = sequelize.define('Text', {
+  type: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  content: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  },
+  timestamp: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  }
 });
-const Text = mongoose.model('Text', textSchema);
 
 app.post('/api/submit-text', async (req, res) => {
   const { type, content } = req.body;
-  const text = new Text({ type, content, timestamp: new Date() });
-  await text.save();
-  res.json({ message: 'Text submitted successfully' });
+  try {
+    await Text.create({ type, content });
+    res.json({ message: 'Text submitted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to submit text' });
+  }
 });
 
 app.get('/api/results', async (req, res) => {
-  const texts = await Text.find({});
-  const analysisResults = analyzeTexts(texts);
-  generateExcel(analysisResults);
-  generateWord(analysisResults);
-  res.json(analysisResults);
+  try {
+    const texts = await Text.findAll();
+    const analysisResults = analyzeTexts(texts);
+    res.json(analysisResults);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch results' });
+  }
 });
 
 function analyzeTexts(texts) {
-  // Perform text analysis according to the criteria
-  // Return the results
-}
+  // Exemple d'analyse de texte selon les critères fournis
+  let strictlyEpisodicScore = 0;
+  let autobiographicalMemoryScore = 0;
 
-function generateExcel(results) {
-  // Use xlsx library to create Excel file
-}
+  texts.forEach((text) => {
+    // Logique d'analyse simplifiée pour l'exemple
+    if (text.content.includes('unique')) strictlyEpisodicScore += 1;
+    if (text.content.includes('détails')) autobiographicalMemoryScore += 1;
+  });
 
-function generateWord(results) {
-  // Use docx library to create Word file
+  return {
+    strictlyEpisodicScore,
+    autobiographicalMemoryScore
+  };
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await sequelize.sync({ force: true });
   console.log(`Server is running on port ${PORT}`);
 });
